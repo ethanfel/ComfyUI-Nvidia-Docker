@@ -131,6 +131,9 @@ LABEL org.opencontainers.image.source="https://github.com/ethanfel/ComfyUI-Nvidi
 # Place the init script and its config in / so it can be found by the entrypoint
 COPY --chmod=555 init.bash /comfyui-nvidia_init.bash
 COPY --chmod=555 config.sh /comfyui-nvidia_config.sh
+# Some bind-backed build contexts preserve the source mode despite COPY's
+# --chmod flag. Enforce runtime permissions in a layer as well.
+RUN chmod 0555 /comfyui-nvidia_init.bash /comfyui-nvidia_config.sh
 
 ##### ComfyUI preparation
 # Every sudo group user does not need a password
