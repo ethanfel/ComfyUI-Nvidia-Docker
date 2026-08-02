@@ -2,6 +2,21 @@ FROM nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# RTX PRO 6000 Blackwell workstation/server GPUs are compute capability 12.0.
+# These values keep locally-built CUDA extensions focused on the actual target
+# instead of producing large multi-architecture binaries.
+ENV COMFY_PYTHON_VERSION=3.13.14 \
+    COMFY_TORCH_BACKEND=cu130 \
+    COMFY_TORCH_PACKAGES="torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130" \
+    TORCH_LOCK="torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130" \
+    TORCH_CUDA_ARCH_LIST=12.0 \
+    CUDAARCHS=120 \
+    CMAKE_CUDA_ARCHITECTURES=120 \
+    CUDA_MODULE_LOADING=LAZY \
+    USE_UV=true \
+    UPDATE_UV=false \
+    USE_PIPUPGRADE=false
+
 ARG BUILD_APT_PROXY
 # Make use of apt-cacher-ng if available
 RUN if [ "A${BUILD_APT_PROXY:-}" != "A" ]; then \
@@ -26,6 +41,21 @@ RUN wget -qO /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute
 
 ARG BASE_DOCKER_FROM=nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
 ##### Base
+
+# uv is baked into the image instead of downloading an unpinned installer at
+# every container start. It also supplies an isolated, current CPython for
+# targets that set COMFY_PYTHON_VERSION.
+COPY --from=ghcr.io/astral-sh/uv:0.11.29 /uv /uvx /usr/local/bin/
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python \
+    UV_PYTHON_BIN_DIR=/usr/local/bin \
+    UV_COMPILE_BYTECODE=1
+
+RUN if [ -n "${COMFY_PYTHON_VERSION:-}" ]; then \
+      uv python install --no-cache --default --install-dir "${UV_PYTHON_INSTALL_DIR}" "${COMFY_PYTHON_VERSION}"; \
+      test "$(python3 -c 'import platform; print(platform.python_version())')" = "${COMFY_PYTHON_VERSION}"; \
+    fi
+
+ENV UV_PYTHON_DOWNLOADS=never
 
 # Install system packages
 ENV DEBIAN_FRONTEND=noninteractive
@@ -93,6 +123,10 @@ RUN echo "CUDNN: ${NV_CUDNN_PACKAGE_NAME} (${NV_CUDNN_VERSION})" | tee -a ${BUIL
 ARG BUILD_BASE="unknown"
 LABEL comfyui-nvidia-docker-build-from=${BUILD_BASE}
 RUN it="/etc/build_base.txt"; echo ${BUILD_BASE} > $it && chmod 555 $it
+
+LABEL org.opencontainers.image.source="https://github.com/ethanfel/ComfyUI-Nvidia-Docker" \
+      org.opencontainers.image.description="ComfyUI NVIDIA container with a Python 3.13 / CUDA 13.2 Blackwell target" \
+      org.opencontainers.image.licenses="MIT"
 
 # Place the init script and its config in / so it can be found by the entrypoint
 COPY --chmod=555 init.bash /comfyui-nvidia_init.bash

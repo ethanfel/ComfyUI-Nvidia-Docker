@@ -1,0 +1,31 @@
+services:
+  comfyui-nvidia:
+    image: ghcr.io/ethanfel/comfyui-nvidia-docker:blackwell
+    container_name: comfyui-nvidia-blackwell
+    ports:
+      - "127.0.0.1:8188:8188"
+    volumes:
+      - ./run:/comfy/mnt
+      - ./basedir:/basedir
+    restart: unless-stopped
+    shm_size: "8gb"
+    environment:
+      USE_UV: "true"
+      UPDATE_UV: "false"
+      USE_PIPUPGRADE: "false"
+      WANTED_UID: "1000"
+      WANTED_GID: "1000"
+      BASE_DIRECTORY: /basedir
+      SECURITY_LEVEL: normal
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+      # Blackwell-safe speed options. The attention implementation remains on
+      # ComfyUI auto-selection so incompatible custom nodes can fall back.
+      COMFY_CMDLINE_EXTRA: --fast fp16_accumulation --cuda-malloc
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]

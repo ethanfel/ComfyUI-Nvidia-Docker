@@ -2,6 +2,21 @@ FROM nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# RTX PRO 6000 Blackwell workstation/server GPUs are compute capability 12.0.
+# These values keep locally-built CUDA extensions focused on the actual target
+# instead of producing large multi-architecture binaries.
+ENV COMFY_PYTHON_VERSION=3.13.14 \
+    COMFY_TORCH_BACKEND=cu130 \
+    COMFY_TORCH_PACKAGES="torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130" \
+    TORCH_LOCK="torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130" \
+    TORCH_CUDA_ARCH_LIST=12.0 \
+    CUDAARCHS=120 \
+    CMAKE_CUDA_ARCHITECTURES=120 \
+    CUDA_MODULE_LOADING=LAZY \
+    USE_UV=true \
+    UPDATE_UV=false \
+    USE_PIPUPGRADE=false
+
 ARG BUILD_APT_PROXY
 # Make use of apt-cacher-ng if available
 RUN if [ "A${BUILD_APT_PROXY:-}" != "A" ]; then \

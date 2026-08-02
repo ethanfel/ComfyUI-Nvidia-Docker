@@ -4,7 +4,7 @@ ifneq (,$(wildcard .env))
 endif
 
 SHELL := /bin/bash
-.PHONY: all build build-dgx clean docker_tag_list docker_buildx_rm docker_rmi docker_tag docker_push docker_rmi docker_rmi_hub docker_tag_list userscripts
+.PHONY: all build build-dgx blackwell blackwell-dockerfile blackwell-push clean docker_tag_list docker_buildx_rm docker_rmi docker_tag docker_push docker_rmi docker_rmi_hub docker_tag_list userscripts
 
 # Try to optimize caching for development
 RELEASE_BUILD=true
@@ -16,7 +16,7 @@ DOCKER_CMD=docker
 DOCKER_PRE="NVIDIA_VISIBLE_DEVICES=all"
 DOCKER_BUILD_ARGS=
 
-COMFYUI_NVIDIA_DOCKER_VERSION=20260605
+COMFYUI_NVIDIA_DOCKER_VERSION=20260802
 
 DEFAULT_PLATFORM=linux/amd64
 DEFAULT_ARCH=x86_64
@@ -24,6 +24,9 @@ DGX_PLATFORM=linux/arm64
 DGX_ARCH=arm64
 
 COMFYUI_CONTAINER_NAME=comfyui-nvidia-docker
+BLACKWELL_TARGET=ubuntu24_cuda13.2
+GHCR_IMAGE?=ghcr.io/ethanfel/comfyui-nvidia-docker
+BLACKWELL_LOCAL_IMAGE=${COMFYUI_CONTAINER_NAME}:${BLACKWELL_TARGET}
 
 COMPONENTS_DIR=components
 DOCKERFILE_DIR=Dockerfile
@@ -53,6 +56,23 @@ all_dgx:
 build: ${DOCKER_ALL}
 
 build-dgx: ${DOCKER_ALL_DGX}
+
+# RTX PRO 6000 Blackwell (sm_120) release image.
+blackwell: ${BLACKWELL_TARGET}
+
+# Generate the exact Dockerfile used by local and GitHub Actions builds.
+blackwell-dockerfile: ${DOCKERFILE_DIR}
+	@cat ${COMPONENTS_DIR}/base-${BLACKWELL_TARGET}.Dockerfile > ${DOCKERFILE_DIR}/${BLACKWELL_TARGET}.Dockerfile
+	@cat ${COMPONENTS_DIR}/part1-common.Dockerfile >> ${DOCKERFILE_DIR}/${BLACKWELL_TARGET}.Dockerfile
+
+# Assumes `docker login ghcr.io` has already completed.
+blackwell-push:
+	@docker tag ${BLACKWELL_LOCAL_IMAGE} ${GHCR_IMAGE}:blackwell
+	@docker tag ${BLACKWELL_LOCAL_IMAGE} ${GHCR_IMAGE}:cuda13.2-py3.13
+	@docker tag ${BLACKWELL_LOCAL_IMAGE} ${GHCR_IMAGE}:${COMFYUI_NVIDIA_DOCKER_VERSION}-blackwell
+	@docker push ${GHCR_IMAGE}:blackwell
+	@docker push ${GHCR_IMAGE}:cuda13.2-py3.13
+	@docker push ${GHCR_IMAGE}:${COMFYUI_NVIDIA_DOCKER_VERSION}-blackwell
 
 ${DOCKERFILE_DIR}:
 	@mkdir -p ${DOCKERFILE_DIR}

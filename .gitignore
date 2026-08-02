@@ -5,6 +5,10 @@
 # Mac cache
 .DS_Store
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # version grab
 .comfyui_version
 

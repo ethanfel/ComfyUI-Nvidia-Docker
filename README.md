@@ -19,9 +19,40 @@
   - including [Unraid](https://unraid.net) compatible images
 - open-source: build it yourself using the corresponding `Dockerfile` present in the directory of the same name and review the `init.bash` (i.e. the setup logic)
 
+## RTX PRO 6000 Blackwell image
+
+This fork publishes an x86-64 image optimized for the RTX PRO 6000 Blackwell
+(compute capability 12.0):
+
+```bash
+docker pull ghcr.io/ethanfel/comfyui-nvidia-docker:blackwell
+```
+
+The pinned stack is Ubuntu 24.04, NVIDIA CUDA 13.2.1 development libraries,
+Python 3.13.14, PyTorch 2.13.0, TorchVision 0.28.0, and TorchAudio 2.11.0.
+The complete PyTorch stack uses its CUDA 13.0 wheels: PyTorch and TorchVision
+publish CUDA 13.2 wheels, but ComfyUI also requires TorchAudio and no matching
+CUDA 13.2 TorchAudio wheel is available yet. CUDA extensions still compile with
+the newer 13.2 toolchain and target only `sm_120`. `uv` is included in the image
+instead of being downloaded on each start. Ubuntu is kept deliberately: NVIDIA
+publishes and tests this CUDA/cuDNN development base, and it has the broadest
+compatibility with ComfyUI custom-node build scripts.
+
+Use [compose-blackwell.yaml](./compose-blackwell.yaml) for a new installation:
+
+```bash
+mkdir -p run basedir
+docker compose -f compose-blackwell.yaml up -d
+```
+
+The first start creates a new Python 3.13 virtual environment. An existing
+Python 3.12 environment is preserved under its versioned name rather than being
+overwritten. Other published aliases are `cuda13.2-py3.13` and
+`20260802-blackwell`.
+
 <h2>USE_UV=true</h2>
 
-**Although `USE_UV` is not enabled by default, it is recommended to use `uv`** instead of `pip` for faster and more reliable installations. The logic to set the proper `UV_TORCH_BACKEND` is already implemented in the main script, so in general, users should not have to set `PREINSTALL_TORCH_CMD`.
+**The Blackwell image enables `USE_UV` by default; for other image tags it is recommended to enable `uv`** instead of `pip` for faster and more reliable installations. The logic to set the proper `UV_TORCH_BACKEND` is already implemented in the main script, so in general, users should not have to set `PREINSTALL_TORCH_CMD`.
 
 <h2>TORCH_LOCK</h2>
 
@@ -118,10 +149,11 @@ If this version is incompatible with your container runtime, please see the list
 | ubuntu24_cuda12.5-latest | | was `latest` up to `20250320` release |
 | ubuntu24_cuda12.6-latest | | was `latest` up to `20260509` release |
 | ubuntu24_cuda12.8-latest | | was `latest` up to `20260605` release -- minimum required for Blackwell (inc RTX 50xx) hardware (see "Blackwell support" section) |
-| ubuntu24_cuda12.9-latest | `latest` | `latest` as of `20260605` release -- upgrade needed due to ["... Deprecating CUDA 12.8 (Release 2.12)"]https://dev-discuss.pytorch.org/t/introducing-cuda-13-2-and-deprecating-cuda-12-8-release-2-12/3337) |
+| ubuntu24_cuda12.9-latest | `latest` | `latest` as of `20260605` release -- upgrade needed due to [PyTorch deprecating CUDA 12.8 in release 2.12](https://dev-discuss.pytorch.org/t/introducing-cuda-13-2-and-deprecating-cuda-12-8-release-2-12/3337) |
 | ubuntu24_cuda13.0-latest | | |
 | ubuntu24_cuda13.1-latest | | |
 | ubuntu24_cuda13.2-latest | | |
+| `ghcr.io/ethanfel/comfyui-nvidia-docker:blackwell` | RTX PRO 6000 | Python 3.13.14 + PyTorch 2.13/cu130; CUDA 13.2 extensions target `sm_120` |
 
 For more details on driver capabilities and how to update those, please see [Setting up NVIDIA docker & podman (Ubuntu 24.04)](https://www.gkr.one/blg-20240523-u24-nvidia-docker-podman).
 

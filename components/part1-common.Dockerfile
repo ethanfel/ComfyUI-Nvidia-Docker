@@ -1,5 +1,20 @@
 ##### Base
 
+# uv is baked into the image instead of downloading an unpinned installer at
+# every container start. It also supplies an isolated, current CPython for
+# targets that set COMFY_PYTHON_VERSION.
+COPY --from=ghcr.io/astral-sh/uv:0.11.29 /uv /uvx /usr/local/bin/
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python \
+    UV_PYTHON_BIN_DIR=/usr/local/bin \
+    UV_COMPILE_BYTECODE=1
+
+RUN if [ -n "${COMFY_PYTHON_VERSION:-}" ]; then \
+      uv python install --no-cache --default --install-dir "${UV_PYTHON_INSTALL_DIR}" "${COMFY_PYTHON_VERSION}"; \
+      test "$(python3 -c 'import platform; print(platform.python_version())')" = "${COMFY_PYTHON_VERSION}"; \
+    fi
+
+ENV UV_PYTHON_DOWNLOADS=never
+
 # Install system packages
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y --fix-missing \
@@ -66,6 +81,10 @@ RUN echo "CUDNN: ${NV_CUDNN_PACKAGE_NAME} (${NV_CUDNN_VERSION})" | tee -a ${BUIL
 ARG BUILD_BASE="unknown"
 LABEL comfyui-nvidia-docker-build-from=${BUILD_BASE}
 RUN it="/etc/build_base.txt"; echo ${BUILD_BASE} > $it && chmod 555 $it
+
+LABEL org.opencontainers.image.source="https://github.com/ethanfel/ComfyUI-Nvidia-Docker" \
+      org.opencontainers.image.description="ComfyUI NVIDIA container with a Python 3.13 / CUDA 13.2 Blackwell target" \
+      org.opencontainers.image.licenses="MIT"
 
 # Place the init script and its config in / so it can be found by the entrypoint
 COPY --chmod=555 init.bash /comfyui-nvidia_init.bash

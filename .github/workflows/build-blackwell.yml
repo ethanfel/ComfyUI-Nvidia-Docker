@@ -1,0 +1,52 @@
+name: Build Blackwell image
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "blackwell-*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate release Dockerfile
+        run: make blackwell-dockerfile
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/comfyui-nvidia-docker
+          tags: |
+            type=raw,value=blackwell
+            type=raw,value=cuda13.2-py3.13
+            type=sha
+            type=ref,event=tag
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile/ubuntu24_cuda13.2.Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BUILD_ARCH=x86_64
+            BUILD_BASE=ubuntu24_cuda13.2
+            COMFYUI_NVIDIA_DOCKER_VERSION=20260802
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}

@@ -48,6 +48,11 @@ export ENV_OBFUSCATE_PART="TOKEN API KEY"
 # PREINSTALL_TORCH_CMD: when PREINSTALL_TORCH is set to true, will use the command specified in this variable to install torch
 #export PREINSTALL_TORCH_CMD="pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126"
 
+# uv is included in current images. Leave UPDATE_UV disabled for reproducible
+# starts; opt in only when intentionally testing a newer uv release.
+#export USE_UV="true"
+#export UPDATE_UV="false"
+
 ## NVIDIA specific adds
 #export NVIDIA_VISIBLE_DEVICES=all
 #export NVIDIA_DRIVER_CAPABILITIES=all

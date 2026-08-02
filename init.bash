@@ -130,14 +130,14 @@ if test -z ${COMFYUSER_DIR}; then error_exit "Empty COMFYUSER_DIR variable"; fi
 # extract build base information
 it=/etc/build_base.txt
 if [ ! -f $it ]; then error_exit "$it missing, exiting"; fi
-BUILD_BASE=`cat $it`
+BUILD_BASE_RAW=`cat $it`
 BUILD_BASE_FILE=$it
 BUILD_BASE_SPECIAL="ubuntu22_cuda12.3.2" # this is a special value: when this feature was introduced, will be used to mark exisitng venv if the marker is not present
-echo "-- BUILD_BASE: \"${BUILD_BASE}\""
-if test -z ${BUILD_BASE}; then error_exit "Empty BUILD_BASE variable"; fi
-if [ "A${BUILD_BASE}" == "Aunknown" ]; then error_exit "Invalid BUILD_BASE value"; fi
-DGX_BUILD=$(echo "${BUILD_BASE}" | grep -q "dgx" && echo "true" || echo "false")
-BUILD_BASE=$(echo "${BUILD_BASE}" | sed 's/-dgx//g')
+echo "-- BUILD_BASE: \"${BUILD_BASE_RAW}\""
+if test -z "${BUILD_BASE_RAW}"; then error_exit "Empty BUILD_BASE variable"; fi
+if [ "A${BUILD_BASE_RAW}" == "Aunknown" ]; then error_exit "Invalid BUILD_BASE value"; fi
+DGX_BUILD=$(echo "${BUILD_BASE_RAW}" | grep -q "dgx" && echo "true" || echo "false")
+BUILD_BASE=$(echo "${BUILD_BASE_RAW}" | sed 's/-dgx//g')
 if [ "A${DGX_BUILD}" == "Atrue" ]; then echo "-- DGX_BUILD: \"${DGX_BUILD}\""; fi
 
 # Check user id and group id
@@ -307,7 +307,9 @@ cuda_version=$(echo "${BUILD_BASE}" | awk -F'cuda' '{print $2}')
 cuda_major=$(echo "$cuda_version" | awk -F'.' '{print $1}')
 cuda_minor=$(echo "$cuda_version" | awk -F'.' '{print $2}')
 echo "-- Found Max container CUDA version: $cuda_version (major: $cuda_major, minor: $cuda_minor)"
-if [ $driver_cuda_minor -gt $cuda_minor ]; then echo "FYSA: The Driver CUDA supports a more recent version than the used container does. Consider using a more recent container version (if available)."; fi
+if [ "$driver_cuda_major" -gt "$cuda_major" ] || { [ "$driver_cuda_major" -eq "$cuda_major" ] && [ "$driver_cuda_minor" -gt "$cuda_minor" ]; }; then
+  echo "FYSA: The Driver CUDA supports a more recent version than the used container does. Consider using a more recent container version (if available)."
+fi
 
 
 dir_validate() { # arg1 = directory to validate / arg2 = "mount" or ""; a "mount" can not be chmod'ed
@@ -372,7 +374,7 @@ PIP3_BASE="pip3"
 ## uv setup
 USE_UV=${USE_UV:-"false"}
 USE_UV=`lc "${USE_UV}"`
-UPDATE_UV=${UPDATE_UV:-"true"}
+UPDATE_UV=${UPDATE_UV:-"false"}
 if [ "A${USE_UV}" == "Atrue" ]; then
   if [ "A${UPDATE_UV}" == "Atrue" ]; then
     echo "== Updating uv"
@@ -440,7 +442,7 @@ cd $it_dir # ${COMFYUSER_DIR}/mnt -- stay here for the following checks/setups
 if [ ! -d "ComfyUI" ]; then
   echo ""; echo "== Cloning ComfyUI"
   git clone ${COMFY_REPO_URL} ComfyUI || error_exit "ComfyUI clone failed"
-  if [ "$A{DISABLE_UPGRADES}" == "Atrue" ]; then
+  if [ "A${DISABLE_UPGRADES}" == "Atrue" ]; then
     echo ""; echo "== This is a new installation, setting DISABLE_UPGRADES to false"
     DISABLE_UPGRADES=false
   fi
@@ -501,22 +503,25 @@ fi
 ##
 echo ""; echo "== Matching any existing venv to container's BUILD_BASE (${BUILD_BASE})"
 SWITCHED_VENV=true # this is a marker to indicate that we have switched to a different venv, which is set unless we re-use the same venv as before (see below)
+PYTHON_ABI=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+VENV_ID="${BUILD_BASE_RAW}_py${PYTHON_ABI}"
+echo "== Virtualenv identity: ${VENV_ID}"
 # Check for an existing venv; if present, is it the proper one -- ie does its .build_base.txt match the container's BUILD_BASE_FILE?
 if [ -d venv ]; then
   it=venv/.build_base.txt
   venv_bb=`cat $it`
 
   echo ""
-  if cmp --silent $it $BUILD_BASE_FILE; then
-    echo "== venv is for this BUILD_BASE (${BUILD_BASE})"
+  if [ "A${venv_bb}" == "A${VENV_ID}" ]; then
+    echo "== venv is for this image/Python combination (${VENV_ID})"
     SWITCHED_VENV=false
   else
     echo "== venv ($venv_bb) is not for this BUILD_BASE (${BUILD_BASE}), renaming it and seeing if a valid one is present"
     mv venv venv-${venv_bb} || error_exit "Failed to rename venv to venv-${venv_bb}"
 
-    if [ -d venv-${BUILD_BASE} ]; then
-      echo "== Existing venv (${BUILD_BASE}) found, attempting to use it"
-      mv venv-${BUILD_BASE} venv || error_exit "Failed to rename ven-${BUILD_BASE} to venv"
+    if [ -d "venv-${VENV_ID}" ]; then
+      echo "== Existing venv (${VENV_ID}) found, attempting to use it"
+      mv "venv-${VENV_ID}" venv || error_exit "Failed to rename venv-${VENV_ID} to venv"
     fi
   fi
 fi
@@ -526,7 +531,7 @@ echo ""; echo "== Create virtualenv for installation (if not present)"
 if [ ! -d "venv" ]; then
   echo ""; echo "== Creating virtualenv"
   python3 -m venv venv || error_exit "Virtualenv creation failed"
-  echo $BUILD_BASE > venv/.build_base.txt
+  echo "$VENV_ID" > venv/.build_base.txt
 fi
 
 ##
@@ -541,6 +546,10 @@ it="${it_dir}/bin/activate"
 if [ ! -f "$it" ]; then error_exit "virtualenv not created, please erase any venv directory"; fi
 echo ""; echo "  == Activating virtualenv"
 source "$it" || error_exit "Virtualenv activation failed"
+# Keep compatibility with userscripts that expect uv beside the venv's Python.
+if command -v uv &>/dev/null && [ ! -e "${it_dir}/bin/uv" ]; then
+  ln -s "$(command -v uv)" "${it_dir}/bin/uv" || error_exit "Failed to link uv into the virtualenv"
+fi
 if [ "A${DISABLE_UPGRADES}" != "Atrue" ]; then
   echo ""; echo "  == Upgrading pip"
   ${PIP3_CMD} pip || error_exit "Pip upgrade failed"
@@ -649,12 +658,19 @@ if [ "$cuda_major" -lt 13 ]; then
   else # CUDA 12.9
     cuda_backend="cu129"
   fi
-else # CUDA 13.2 -- https://download.pytorch.org/whl/cu132 is now there, but uv does not yet support it -- staying with cu130 for now
-#  if [ "$cuda_minor" -gt 1 ]; then
-#    cuda_backend="cu132"
-#  else # CUDA 13.0 and 13.1 use the same wheel
-    cuda_backend="cu130"
-#  fi
+else
+  # ComfyUI requires TorchAudio, which does not yet publish a cu132 wheel.
+  # Use the newest complete CUDA 13 stack unless a target explicitly opts in.
+  cuda_backend="cu130"
+fi
+
+# A target may explicitly select a compatible PyTorch wheel backend.
+if [ -n "${COMFY_TORCH_BACKEND:-}" ]; then
+  cuda_backend="${COMFY_TORCH_BACKEND}"
+fi
+
+if [ -n "${COMFY_TORCH_PACKAGES:-}" ]; then
+  torch_version="${COMFY_TORCH_PACKAGES}"
 fi
 
 # check that cuda_backend is set
