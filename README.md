@@ -608,7 +608,9 @@ A few scripts are provided in the `userscripts_dir` folder:
 - [11-onnxruntime-gpu.sh](userscripts_dir/11-onnxruntime-gpu.sh)
 - [12-xformers.sh](userscripts_dir/12-xformers.sh)
 - [13-nunchaku.sh](userscripts_dir/13-nunchaku.sh), is required to allow the installation of the `nunchaku` custom node.
-- [20-SageAttention.sh](userscripts_dir/20-SageAttention.sh), to enable add `--use-sage-attention` to the `COMFY_CMDLINE_EXTRA` environment variable.
+- [20-SageAttention2.sh](userscripts_dir/20-SageAttention2.sh) builds SageAttention 2; add `--use-sage-attention` to the `COMFY_CMDLINE_EXTRA` environment variable to enable it.
+- [21-SageAttention-Blackwell-SM120.sh](userscripts_dir/21-SageAttention-Blackwell-SM120.sh), a persistent, ABI-aware SageAttention 2.2 build for consumer/workstation Blackwell GPUs (SM120/SM120a).
+- [21-SageAttention3-BlackwellOnly.sh](userscripts_dir/21-SageAttention3-BlackwellOnly.sh), which builds SageAttention 3 for supported Blackwell GPUs.
 - [30-PortAudio.sh](userscripts_dir/30-PortAudio.sh)
 - [90_Fix_libmvec-2_error.sh](userscripts_dir/90_Fix_libmvec-2_error.sh)
 
