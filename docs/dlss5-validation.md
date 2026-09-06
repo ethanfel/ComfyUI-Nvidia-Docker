@@ -1,6 +1,6 @@
 # DLSS-ready image validation — 2026-09-06
 
-## Scope
+## Initial validation scope
 
 Tested the new `components/part2-dlss5.Dockerfile` layer on the exact existing
 Blackwell production image, not a full rebuild of the unchanged CUDA/Python base.
@@ -87,7 +87,29 @@ Tested helper SHA256:
 `59f8f60cdac77b5c372d3c3573b3da2551968220c18d6fd826c95b4606c3d175`.
 Tested `init.bash` SHA256:
 `499eaba572c9d2441e5b6bbd516ec2714a04d55057278bfd95061cdb7aeb25e3`.
-The image still needs rebuilding/publishing to distribute these follow-up changes.
+These follow-up changes are included in the published release below.
+
+## Published release
+
+The full release Dockerfile was built and pushed successfully by
+[GitHub Actions run 34050806752](https://github.com/ethanfel/ComfyUI-Nvidia-Docker/actions/runs/34050806752)
+on 2026-09-06. The job passed all 24 helper tests and completed in 7m13s.
+
+- Source revision: `780c0c0ac06428259893280e983fcb4a24c7ed52`.
+- Image: `ghcr.io/ethanfel/comfyui-nvidia-docker:blackwell-20260906-dlss5`.
+- Matching public aliases: `blackwell`, `20260906-blackwell`, `cuda13.2-py3.13`.
+- OCI index digest: `sha256:7c67c51fb38933a2b37eac0a63eaab53f323d9779b905ed525d6c35928ea25a3`.
+- Linux amd64 manifest: `sha256:09f40b11bd4d94be5cb7c17b3a8ddd5728ae924ce46d93affb6593cd2c086480`.
+- Image ID: `sha256:9d08d56e5747d294449c4ffdb85d7c121a418bd77ae2ff0e660d59b8378030f8`.
+
+A complete pull using an empty Docker credential directory succeeded, confirming
+anonymous access. A disposable, network-disabled local container then passed
+entrypoint/config shell syntax checks, executable permission checks, helper
+`--help`, and disabled `--startup` checks. Wine reported 11.17 and Python 3.13.14.
+The entrypoint, config and helper hashes matched the release source exactly;
+no `/opt/dlss-probe` test payload was present in the image. All four public aliases
+resolved to the same manifests. The publishing operation did not update or
+restart the production Unraid container.
 
 ## Boundaries and retained artifacts
 
