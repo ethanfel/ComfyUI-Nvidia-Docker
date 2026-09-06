@@ -1,0 +1,10 @@
+#!/usr/bin/python3
+"""Dependency-free setup and lazy Wine launcher. Never install during rendering."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from support import main
+
+if __name__ == "__main__":
+    main(wine=Path(sys.argv[0]).name == "comfy-dlss5-wine")

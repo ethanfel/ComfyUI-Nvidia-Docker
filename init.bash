@@ -959,6 +959,23 @@ echo ""; echo "== Checking for primary user script: ${it}"
 run_userscript $it "chmod"
 
 
+# BEGIN optional DLSS auto-setup
+# Run as comfy, with the active venv, after scripts may have installed the node.
+# This is opt-in and must not stop normal ComfyUI startup if DLSS setup fails.
+case "${DLSS5_AUTO_SETUP:-false}" in
+  [Ff][Aa][Ll][Ss][Ee]) ;;
+  *)
+    if command -v comfy-dlss5-setup >/dev/null 2>&1; then
+      DLSS5_AUTO_SETUP="${DLSS5_AUTO_SETUP}" comfy-dlss5-setup --startup || \
+        echo "!! DLSS auto-setup failed; continuing ComfyUI startup. The enhancer may be unavailable; inspect the setup error above."
+    else
+      echo "!! DLSS auto-setup requested but this image has no comfy-dlss5-setup helper; continuing ComfyUI startup."
+    fi
+    ;;
+esac
+# END optional DLSS auto-setup
+
+
 # Saving environment variables
 it=/tmp/comfy_env_final.txt
 save_env $it

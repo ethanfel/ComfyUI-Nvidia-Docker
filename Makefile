@@ -16,7 +16,7 @@ DOCKER_CMD=docker
 DOCKER_PRE="NVIDIA_VISIBLE_DEVICES=all"
 DOCKER_BUILD_ARGS=
 
-COMFYUI_NVIDIA_DOCKER_VERSION=20260802
+COMFYUI_NVIDIA_DOCKER_VERSION=20260906
 
 DEFAULT_PLATFORM=linux/amd64
 DEFAULT_ARCH=x86_64
@@ -64,6 +64,7 @@ blackwell: ${BLACKWELL_TARGET}
 blackwell-dockerfile: ${DOCKERFILE_DIR}
 	@cat ${COMPONENTS_DIR}/base-${BLACKWELL_TARGET}.Dockerfile > ${DOCKERFILE_DIR}/${BLACKWELL_TARGET}.Dockerfile
 	@cat ${COMPONENTS_DIR}/part1-common.Dockerfile >> ${DOCKERFILE_DIR}/${BLACKWELL_TARGET}.Dockerfile
+	@cat ${COMPONENTS_DIR}/part2-dlss5.Dockerfile >> ${DOCKERFILE_DIR}/${BLACKWELL_TARGET}.Dockerfile
 
 # Assumes `docker login ghcr.io` has already completed.
 blackwell-push:
@@ -98,6 +99,7 @@ ${DOCKER_ALL}: ${DOCKERFILE_DIR}
 	@$(eval DOCKERFILE_NAME="${DOCKERFILE_DIR}/$@.Dockerfile")
 	@cat ${COMPONENTS_DIR}/base-$@.Dockerfile > ${DOCKERFILE_NAME}
 	@cat ${COMPONENTS_DIR}/part1-common.Dockerfile >> ${DOCKERFILE_NAME}
+	@if [ "$@" = "${BLACKWELL_TARGET}" ]; then cat ${COMPONENTS_DIR}/part2-dlss5.Dockerfile >> ${DOCKERFILE_NAME}; fi
 	@$(eval VAR_NT="${COMFYUI_CONTAINER_NAME}-$@")
 	@echo "-- Docker command to be run:"
 	@if [ "A${RELEASE_BUILD}" = "Atrue" ]; then \

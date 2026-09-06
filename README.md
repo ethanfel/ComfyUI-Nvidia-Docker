@@ -47,8 +47,129 @@ docker compose -f compose-blackwell.yaml up -d
 
 The first start creates a new Python 3.13 virtual environment. An existing
 Python 3.12 environment is preserved under its versioned name rather than being
-overwritten. Other published aliases are `cuda13.2-py3.13` and
-`20260802-blackwell`.
+overwritten. Other release aliases are `cuda13.2-py3.13` and
+`20260906-blackwell`. The versioned DLSS-ready release tag is
+`blackwell-20260906-dlss5`; the older `20260802-blackwell` image does not include
+the DLSS support helpers.
+
+### Optional DLSS5 Enhancer support
+
+The Blackwell Dockerfile now includes Wine 11.17, MinGW-w64, Vulkan tools,
+and an authenticated headless Xorg display with a valid 60 Hz mode. This is
+**image-side preparation**, not an installation of the custom node. Use release
+`blackwell-20260906-dlss5` or newer for these helpers.
+Neither the enhancer nor proprietary neural/driver DLLs are bundled in the image.
+Python, PyTorch and your existing venv are unchanged. The entrypoint has an
+optional, disabled-by-default setup hook immediately before ComfyUI starts.
+
+#### Automatic setup (Unraid / Docker environment variable)
+
+In the Unraid container editor, add a **Variable** with Key `DLSS5_AUTO_SETUP`
+and Value `true`. Alternatively, Docker's Extra Parameters can contain:
+
+```text
+-e DLSS5_AUTO_SETUP=true
+```
+
+Install the Linux-capable enhancer through ComfyUI Manager as usual, then restart
+the container. On startup, after the venv and user scripts are ready, the image
+will run the node's runtime installer (`--yes`) **only if the neural runtime is
+missing**, then prepare/reuse the managed Wine prefix. Enabling this variable
+opts into those third-party runtime and supporting DLL downloads; review the
+runtime's terms/source before enabling it. It does not clone the node or install
+Python packages. Initial setup can take several minutes and appears in the Docker
+log. Later starts use the saved runtime, cached DLLs and existing prefix.
+
+The default node path is `${BASE_DIRECTORY}/custom_nodes/ComfyUI-DLSS5-Enhancer`,
+or `${COMFYUI_PATH}/custom_nodes/ComfyUI-DLSS5-Enhancer` without a base directory.
+Optional variables `DLSS5_NODE_DIR` and `DLSS5_STATE_DIR` override the node path
+and persistent state directory (default `/comfy/mnt/dlss5`). If you chose a
+different installed folder name, set `DLSS5_NODE_DIR` accordingly.
+
+When the node is absent, setup logs a skip and ComfyUI still starts. A setup
+failure also logs a warning without preventing normal ComfyUI startup. A missing
+configured external runtime is treated as an error, not replaced with a download.
+Do not set `DLSS5_RUNTIME_DIR` in automatic mode: the helper manages the node's
+`runtime_dir` configuration. Set `DLSS5_AUTO_SETUP=false` to disable the hook;
+this does not delete the prefix or disable an already-configured enhancer.
+`DISABLE_UPGRADES=true` does not disable this separately opted-in hook.
+
+#### Manual setup (alternative)
+
+After installing a Linux-capable `ComfyUI-DLSS5-Enhancer` (with RTX PRO detection
+support) through your usual custom-node workflow, install its neural runtime,
+then run the setup helper **once**, as the same user as ComfyUI:
+
+```bash
+docker exec --user comfy ComfyUI-Nvidia-Docker \
+  /comfy/mnt/venv/bin/python \
+  /basedir/custom_nodes/ComfyUI-DLSS5-Enhancer/install_runtime.py --yes
+
+docker exec --user comfy ComfyUI-Nvidia-Docker \
+  comfy-dlss5-setup /basedir/custom_nodes/ComfyUI-DLSS5-Enhancer --download
+```
+
+Adjust the container, venv and node paths if yours differ. The first command
+uses the node's own third-party runtime installer; review its terms/source before
+running it. The helper's `--download` explicitly permits downloading pinned
+[Proton CachyOS graphics DLLs](https://github.com/CachyOS/proton-cachyos/releases/tag/cachyos-11.0-20260521-slr)
+and extracting NGX DLLs from the official NVIDIA package matching the **host**
+driver. It never installs or upgrades a host/container NVIDIA driver. The extracted
+Linux NGX library must match the host-injected library byte-for-byte.
+
+For offline setup, replace `--download` with both
+`--proton-dir /path/to/extracted-proton` and
+`--ngx-dir /path/to/extracted-NVIDIA-Linux-x86_64-VERSION`.
+`--runtime-dir /path/to/runtime` selects an already-installed neural runtime.
+Missing native workers are compiled with the node's `native/build_linux.sh`.
+
+Then use the enhancer normally in ComfyUI. Its `config.json` points to the image's
+Wine launcher and a persistent prefix under `/comfy/mnt/dlss5/bundles/` (inside
+your existing `/comfy/mnt` mount, **not** inside a Python venv). Use
+`--state-dir /another/persistent/path` to keep a separate installation.
+The helper preserves unrelated config keys and saves the previous config before
+changing it. It creates its own runtime copy and prefix; it does not overwrite
+your existing Wine prefix or delete old managed bundles. Allow several GB for
+Wine prefixes, runtime copies and cached downloads.
+
+At render time the launcher starts/reuses a private, non-root Xorg dummy display
+and executes Wine. No terminal commands, downloads or prefix rebuilds happen per
+render. No X11 TCP port, host display, privileged container or new mount is needed.
+Xorg remains available until the container stops. Display selection starts at
+`:98` and automatically skips occupied/stale slots after container restarts;
+existing displays and locks are not removed. `DLSS5_DISPLAY=:99` explicitly pins
+a display instead of using automatic selection. Logs live under
+`/tmp/comfy-dlss5-<uid>/`. Default Xvfb is intentionally not used: its zero-refresh
+mode caused an NVAPI/DXGI crash during testing on this GPU.
+
+Keep `NVIDIA_DRIVER_CAPABILITIES=all` (already the image default), and do not set
+`DLSS5_RUNTIME_DIR` to a different runtime: it overrides the node's saved config.
+The wrapper selects one NVIDIA Vulkan ICD only when you have not explicitly set
+`VK_DRIVER_FILES` or `VK_ICD_FILENAMES`.
+
+After a host driver or Wine upgrade, stop/finish enhancer jobs and rerun the helper
+(automatic mode does this at the next container start).
+It selects a new versioned bundle and keeps the previous one. The launcher refuses
+to silently mix a changed driver/Wine version with an old managed prefix. Also
+rerun the helper after the node's runtime installer, which may replace `config.json`.
+After updating the node's native source, rebuild it with `bash native/build_linux.sh`
+from the node directory and rerun setup with `--runtime-dir <node-dir>/runtime`.
+
+To test from inside the container after setup:
+
+```bash
+docker exec --user comfy -w /basedir/custom_nodes/ComfyUI-DLSS5-Enhancer \
+  ComfyUI-Nvidia-Docker /comfy/mnt/venv/bin/python selftest.py \
+  --width 512 --height 512 --frames 3
+```
+
+The native test should report feature 18 verified and no native fallback. A node
+import alone does not prove the graphics/NGX path works. The support stack was
+validated on an RTX PRO 6000 Blackwell with host driver 595.84; other driver versions
+still need their own end-to-end test. CPU-only helper tests:
+`python3 -B -m unittest discover -s tests -v`.
+See [the validation report](docs/dlss5-validation.md) for the tested image,
+restart/upscale results and limitations.
 
 <h2>USE_UV=true</h2>
 

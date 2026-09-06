@@ -53,6 +53,14 @@ export ENV_OBFUSCATE_PART="TOKEN API KEY"
 #export USE_UV="true"
 #export UPDATE_UV="false"
 
+# Optional Blackwell DLSS5 setup at startup, after the node is installed.
+# Opting in permits its runtime installer (--yes) and supporting DLL downloads.
+# Existing setup is reused; the enhancer itself and Python packages are not installed.
+#export DLSS5_AUTO_SETUP="true"
+# Optional overrides (the default node path follows BASE_DIRECTORY/COMFYUI_PATH):
+#export DLSS5_NODE_DIR="/basedir/custom_nodes/ComfyUI-DLSS5-Enhancer"
+#export DLSS5_STATE_DIR="/comfy/mnt/dlss5"
+
 ## NVIDIA specific adds
 #export NVIDIA_VISIBLE_DEVICES=all
 #export NVIDIA_DRIVER_CAPABILITIES=all

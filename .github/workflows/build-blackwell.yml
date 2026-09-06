@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test DLSS support helpers
+        run: python3 -B -m unittest discover -s tests -v
+
       - name: Generate release Dockerfile
         run: make blackwell-dockerfile
 
@@ -35,6 +38,7 @@ jobs:
           tags: |
             type=raw,value=blackwell
             type=raw,value=cuda13.2-py3.13
+            type=raw,value=20260906-blackwell
             type=sha
             type=ref,event=tag
 
@@ -47,6 +51,6 @@ jobs:
           build-args: |
             BUILD_ARCH=x86_64
             BUILD_BASE=ubuntu24_cuda13.2
-            COMFYUI_NVIDIA_DOCKER_VERSION=20260802
+            COMFYUI_NVIDIA_DOCKER_VERSION=20260906
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
